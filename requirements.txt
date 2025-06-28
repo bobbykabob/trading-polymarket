@@ -1,0 +1,11 @@
+py-clob-client
+python-dotenv
+streamlit
+requests
+pandas
+plotly
+numpy
+openai
+pydantic
+aiohttp
+asyncio

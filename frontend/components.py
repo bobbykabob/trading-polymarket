@@ -1,0 +1,170 @@
+"""
+UI components for the trading markets dashboard
+"""
+
+import streamlit as st
+from utils import format_volume, format_price, get_platform_icon, get_trend_icon, format_end_date
+from charts import create_price_history_chart, create_order_book_chart
+from data import get_api_clients
+
+
+def render_controls():
+    """Render the control panel"""
+    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+    
+    with col1:
+        platforms = st.multiselect(
+            "Platforms",
+            ["Polymarket", "Kalshi"],
+            default=["Polymarket"],
+            help="Choose platforms"
+        )
+    
+    with col2:
+        num_markets = st.selectbox(
+            "Markets",
+            options=[5, 10, 15, 20, 25],
+            index=4,
+            help="Number of markets to display"
+        )
+    
+    with col3:
+        refresh_clicked = st.button("Refresh", type="primary")
+    
+    with col4:
+        auto_refresh = st.checkbox("Auto-refresh")
+    
+    with col5:
+        st.caption("*Live data*")
+    
+    return platforms, num_markets, refresh_clicked, auto_refresh
+
+
+def render_summary_stats(top_markets):
+    """Render summary statistics"""
+    total_volume = sum(market.get('volume_24hr', 0) for market in top_markets)
+    avg_volume = total_volume / len(top_markets) if top_markets else 0
+    
+    summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
+    
+    with summary_col1:
+        st.metric("Markets", len(top_markets))
+    
+    with summary_col2:
+        st.metric("Total Volume", format_volume(total_volume))
+    
+    with summary_col3:
+        st.metric("Avg Volume", format_volume(avg_volume))
+    
+    with summary_col4:
+        highest_vol = max((market.get('volume_24hr', 0) for market in top_markets), default=0)
+        st.metric("Highest", format_volume(highest_vol))
+
+
+def render_table_header():
+    """Render the table header"""
+    header_cols = st.columns([0.3, 2.5, 0.6, 0.6, 0.4, 0.4, 0.5, 0.3])
+    with header_cols[0]:
+        st.markdown("**#**")
+    with header_cols[1]:
+        st.markdown("**Market Question**")
+    with header_cols[2]:
+        st.markdown("**Volume**")
+    with header_cols[3]:
+        st.markdown("**Yes**")
+    with header_cols[4]:
+        st.markdown("**No**")
+    with header_cols[5]:
+        st.markdown("**Platform**")
+    with header_cols[6]:
+        st.markdown("**End Date**")
+    with header_cols[7]:
+        st.markdown("**Trend**")
+
+
+def render_market_row(market, rank):
+    """Render a single market row"""
+    yes_price = market.get('yes_price', 0) or 0
+    no_price = market.get('no_price', 0) or 0
+    volume = market.get('volume_24hr', 0)
+    platform = market.get('platform', 'Unknown')
+    question = market.get('question', 'Unknown Market')
+    
+    # Ultra-condensed single row
+    cols = st.columns([0.3, 2.5, 0.6, 0.6, 0.4, 0.4, 0.5, 0.3])
+    
+    with cols[0]:
+        st.markdown(f"**{rank}**")
+    
+    with cols[1]:
+        with st.expander(f"{question[:45]}{'...' if len(question) > 45 else ''}", expanded=False):
+            render_market_details(market)
+    
+    with cols[2]:
+        st.markdown(f"**{format_volume(volume)}**")
+    with cols[3]:
+        st.markdown(f"🟢 **{format_price(yes_price)}**")
+    with cols[4]:
+        st.markdown(f"🔴 **{format_price(no_price)}**")
+    with cols[5]:
+        st.markdown(f"{get_platform_icon(platform)}")
+    with cols[6]:
+        st.markdown(f"**{format_end_date(market.get('end_date', 'Unknown'))}**")
+    with cols[7]:
+        st.markdown(get_trend_icon(yes_price))
+
+
+def render_market_details(market):
+    """Render detailed market information inside expander"""
+    question = market.get('question', 'Unknown Market')
+    
+    # Full details inside expander
+    st.markdown(f"**{question}**")
+    
+    # Description
+    description = market.get('description', '')
+    if description and len(description) > 10:
+        st.caption(description)
+    st.caption(f"**ID:** `{market.get('id', 'Unknown')}`")
+    
+    # Historical price chart and order book
+    market_id = market.get('id')
+    if market_id:
+        try:
+            polymarket_api, _ = get_api_clients()
+            
+            # Create tabs for different visualizations
+            price_tab, depth_tab = st.tabs(["Price History", "Order Book Depth"])
+            
+            with price_tab:
+                st.caption("7-day price history")
+                with st.spinner("Loading price history..."):
+                    historical_data = polymarket_api.get_market_history(market_id, days=7)
+                    
+                    if historical_data:
+                        fig = create_price_history_chart(historical_data)
+                        if fig:
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.caption("No historical data available")
+                    else:
+                        st.caption("No historical data available")
+            
+            with depth_tab:
+                st.caption("Order book depth chart")
+                with st.spinner("Loading order book..."):
+                    order_book_data = polymarket_api.get_order_book(market_id)
+                    
+                    if order_book_data and order_book_data.get('order_books'):
+                        fig = create_order_book_chart(order_book_data)
+                        if fig:
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.caption("No order book data available")
+                    else:
+                        st.caption("No order book data available")
+                
+        except Exception as e:
+            st.caption(f"Chart unavailable: {str(e)[:30]}...")
+    else:
+        st.caption("No market ID available")
