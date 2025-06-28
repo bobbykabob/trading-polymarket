@@ -24,7 +24,7 @@ def render_controls():
         num_markets = st.selectbox(
             "Markets",
             options=[5, 10, 15, 20, 25],
-            index=4,
+            index=0,
             help="Number of markets to display"
         )
     
@@ -133,36 +133,98 @@ def render_market_details(market):
         try:
             polymarket_api, _ = get_api_clients()
             
-            # Create tabs for different visualizations
-            price_tab, depth_tab = st.tabs(["Price History", "Order Book Depth"])
-            
-            with price_tab:
-                st.caption("7-day price history")
-                with st.spinner("Loading price history..."):
-                    historical_data = polymarket_api.get_market_history(market_id, days=7)
-                    
-                    if historical_data:
-                        fig = create_price_history_chart(historical_data)
-                        if fig:
-                            st.plotly_chart(fig, use_container_width=True)
+            # Use container to give charts more space in the UI
+            with st.container():
+                # Create tabs with better styling
+                tab_style = """
+                <style>
+                button[data-baseweb="tab"] {
+                    font-size: 1.1rem;
+                    font-weight: 500;
+                }
+                </style>
+                """
+                st.markdown(tab_style, unsafe_allow_html=True)
+                
+                price_tab, depth_tab = st.tabs(["Price History", "Order Book Depth"])
+                
+                with price_tab:
+                    st.markdown("### 7-Day Price History")
+                    with st.spinner("Loading price history data..."):
+                        historical_data = polymarket_api.get_market_history(market_id, days=7)
+                        
+                        if historical_data:
+                            fig = create_price_history_chart(historical_data)
+                            if fig:
+                                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                            else:
+                                st.info("No historical price data available for this market")
                         else:
-                            st.caption("No historical data available")
-                    else:
-                        st.caption("No historical data available")
-            
-            with depth_tab:
-                st.caption("Order book depth chart")
-                with st.spinner("Loading order book..."):
-                    order_book_data = polymarket_api.get_order_book(market_id)
-                    
-                    if order_book_data and order_book_data.get('order_books'):
-                        fig = create_order_book_chart(order_book_data)
-                        if fig:
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.info("No historical data available")
+                
+                with depth_tab:
+                    st.markdown("## Order Book Depth Chart")
+                    with st.spinner("Loading order book data..."):
+                        order_book_data = polymarket_api.get_order_book(market_id)
+                        
+                        if order_book_data and order_book_data.get('order_books'):
+                            # Add a summary of the order book
+                            total_bids = 0
+                            total_asks = 0
+                            
+                            for outcome, data in order_book_data['order_books'].items():
+                                for bid in data.get('bids', []):
+                                    try:
+                                        total_bids += float(bid.get('size', 0))
+                                    except (ValueError, TypeError):
+                                        pass
+                                
+                                for ask in data.get('asks', []):
+                                    try:
+                                        total_asks += float(ask.get('size', 0))
+                                    except (ValueError, TypeError):
+                                        pass
+                            
+                            # Large formatted dollar values for metrics
+                            formatted_bids = f"${total_bids/1000000:.1f}M" if total_bids >= 1000000 else f"${total_bids/1000:.1f}K" 
+                            formatted_asks = f"${total_asks/1000000:.1f}M" if total_asks >= 1000000 else f"${total_asks/1000:.1f}K"
+                            
+                            # Custom metric styling
+                            metric_style = """
+                            <style>
+                            [data-testid="stMetricValue"] {
+                                font-size: 2rem !important;
+                                font-weight: 700 !important;
+                                color: white !important;
+                            }
+                            [data-testid="stMetricLabel"] {
+                                font-size: 1rem !important;
+                                font-weight: 600 !important;
+                            }
+                            </style>
+                            """
+                            st.markdown(metric_style, unsafe_allow_html=True)
+                            
+                            # Display summary metrics
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Total Bid Volume", formatted_bids)
+                            with col2:
+                                st.metric("Total Ask Volume", formatted_asks)
+                            
+                            # Create and display the chart
+                            fig = create_order_book_chart(order_book_data)
+                            if fig:
+                                st.plotly_chart(fig, use_container_width=True, config={
+                                    "displayModeBar": True,
+                                    "displaylogo": False,
+                                    "modeBarButtonsToAdd": ["zoom2d", "pan2d", "resetScale2d"],
+                                    "modeBarButtonsToRemove": ["lasso2d", "select2d", "toggleSpikelines", "autoScale2d"]
+                                })
+                            else:
+                                st.info("Could not generate order book chart with the available data")
                         else:
-                            st.caption("No order book data available")
-                    else:
-                        st.caption("No order book data available")
+                            st.info("No order book data available for this market")
                 
         except Exception as e:
             st.caption(f"Chart unavailable: {str(e)[:30]}...")

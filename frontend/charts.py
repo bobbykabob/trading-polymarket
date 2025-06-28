@@ -248,14 +248,39 @@ def create_order_book_chart(order_book_data):
     if num_outcomes == 0:
         return None
     
-    # Create subplot titles
-    subplot_titles = [f"{outcome} Order Book" for outcome in order_books.keys()]
+    # Standardize outcome names to handle different formats
+    # Convert keys to title case for consistent display
+    standardized_books = {}
+    for outcome, data in order_books.items():
+        # Handle different outcome name formats
+        std_outcome = outcome
+        if isinstance(outcome, str):
+            # Convert to title case but preserve common formats
+            if outcome.lower() in ["yes", "no", "true", "false"]:
+                std_outcome = outcome.title()
+            elif "yes" in outcome.lower():
+                std_outcome = "Yes"
+            elif "no" in outcome.lower():
+                std_outcome = "No"
+        
+        standardized_books[std_outcome] = data
     
+    order_books = standardized_books
+    
+    # For better formatting, keep only Yes and No outcomes if they exist
+    if "Yes" in order_books and "No" in order_books:
+        filtered_books = {"Yes": order_books["Yes"], "No": order_books["No"]}
+        order_books = filtered_books
+    
+    # Create subplot titles with better formatting
+    subplot_titles = []  # We'll use annotations inside the chart instead
+    
+    # Set up subplots with proper spacing for Yes/No layout
     fig = make_subplots(
         rows=num_outcomes, 
         cols=1,
-        subplot_titles=subplot_titles,
-        vertical_spacing=0.08
+        vertical_spacing=0.15,
+        subplot_titles=None  # No titles, we'll add annotations inside
     )
     
     for idx, (outcome, book_data) in enumerate(order_books.items(), 1):
@@ -268,14 +293,19 @@ def create_order_book_chart(order_book_data):
         cumulative_bid_size = 0
         
         # Sort bids by price descending (highest first)
-        sorted_bids = sorted(bids, key=lambda x: float(x['price']), reverse=True)
-        
-        for bid in sorted_bids:
-            price = float(bid['price'])
-            size = float(bid['size'])
-            cumulative_bid_size += size
-            bid_prices.append(price)
-            bid_sizes.append(cumulative_bid_size)
+        try:
+            sorted_bids = sorted(bids, key=lambda x: float(x['price']), reverse=True)
+            
+            for bid in sorted_bids:
+                price = float(bid['price'])
+                size = float(bid['size'])
+                cumulative_bid_size += size
+                bid_prices.append(price)
+                bid_sizes.append(cumulative_bid_size)
+                
+        except (KeyError, ValueError) as e:
+            print(f"Error processing bids for {outcome}: {e}")
+            continue
         
         # Process asks (sell orders) - cumulative from lowest price up
         ask_prices = []
@@ -283,14 +313,19 @@ def create_order_book_chart(order_book_data):
         cumulative_ask_size = 0
         
         # Sort asks by price ascending (lowest first)
-        sorted_asks = sorted(asks, key=lambda x: float(x['price']))
-        
-        for ask in sorted_asks:
-            price = float(ask['price'])
-            size = float(ask['size'])
-            cumulative_ask_size += size
-            ask_prices.append(price)
-            ask_sizes.append(cumulative_ask_size)
+        try:
+            sorted_asks = sorted(asks, key=lambda x: float(x['price']))
+            
+            for ask in sorted_asks:
+                price = float(ask['price'])
+                size = float(ask['size'])
+                cumulative_ask_size += size
+                ask_prices.append(price)
+                ask_sizes.append(cumulative_ask_size)
+                
+        except (KeyError, ValueError) as e:
+            print(f"Error processing asks for {outcome}: {e}")
+            continue
         
         # Add bid side (green, left side)
         if bid_prices and bid_sizes:
@@ -302,8 +337,9 @@ def create_order_book_chart(order_book_data):
                     fill='tozeroy',
                     name=f'{outcome} Bids',
                     line=dict(color='#10B981', width=2),
-                    fillcolor='rgba(16, 185, 129, 0.3)',
-                    hovertemplate='<b>Price:</b> $%{x:.3f}<br><b>Cumulative Size:</b> %{y:,.0f}<extra></extra>'
+                    fillcolor='rgba(16, 185, 129, 0.5)',
+                    hovertemplate='<b>Price:</b> $%{x:.3f}<br><b>Cumulative Size:</b> %{y:,.0f}<extra></extra>',
+                    showlegend=False
                 ),
                 row=idx, col=1
             )
@@ -318,20 +354,39 @@ def create_order_book_chart(order_book_data):
                     fill='tozeroy',
                     name=f'{outcome} Asks',
                     line=dict(color='#EF4444', width=2),
-                    fillcolor='rgba(239, 68, 68, 0.3)',
-                    hovertemplate='<b>Price:</b> $%{x:.3f}<br><b>Cumulative Size:</b> %{y:,.0f}<extra></extra>'
+                    fillcolor='rgba(239, 68, 68, 0.5)',
+                    hovertemplate='<b>Price:</b> $%{x:.3f}<br><b>Cumulative Size:</b> %{y:,.0f}<extra></extra>',
+                    showlegend=False
                 ),
                 row=idx, col=1
             )
         
-        # Update subplot axes
+        # Add outcome label in the center of the plot (exactly as in screenshot)
+        fig.add_annotation(
+            text=f"{outcome} Order Book",
+            xref=f"x{idx}", yref=f"y{idx}",
+            x=0.5, y=0.5,  # Position in the middle of the plot
+            showarrow=False,
+            font=dict(size=16, color="#FFFFFF", family="Arial, sans-serif"),
+            xanchor="center",
+            yanchor="middle",
+            bgcolor="rgba(0,0,0,0.4)",
+            bordercolor="rgba(255,255,255,0.2)",
+            borderwidth=1,
+            borderpad=4,
+            opacity=0.8,
+            row=idx, col=1
+        )
+        
+        # Update subplot axes with improved styling matching the screenshot
         fig.update_xaxes(
-            title_text="Price ($)" if idx == num_outcomes else "",
+            title_text="Price ($)" if idx == num_outcomes else None,
             gridcolor='rgba(255,255,255,0.1)',
             zerolinecolor='rgba(255,255,255,0.1)',
             tickformat='.3f',
-            tickfont=dict(size=8),
+            tickfont=dict(size=10, color="#FFFFFF"),
             range=[0, 1],  # Polymarket prices are between 0 and 1
+            title_font=dict(size=12, color="#FFFFFF"),
             row=idx, col=1
         )
         
@@ -340,36 +395,81 @@ def create_order_book_chart(order_book_data):
             gridcolor='rgba(255,255,255,0.1)',
             zerolinecolor='rgba(255,255,255,0.1)',
             tickformat=',.0f',
-            tickfont=dict(size=8),
+            tickfont=dict(size=10, color="#FFFFFF"),
+            title_font=dict(size=12, color="#FFFFFF"),
             row=idx, col=1
         )
+        
+        # Remove the bottom label since we already have labels in the center
     
-    # Update overall layout
-    height = max(300, num_outcomes * 250)
+    # Update overall layout with improved styling to match the screenshot
+    height = max(400, num_outcomes * 350)  # More height per plot for better readability
+    
+    # Create legend items for the legend at the top - matching the screenshot exactly
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='lines',
+            name='Yes Bids',
+            line=dict(color='#10B981', width=2),
+            showlegend=True
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='lines',
+            name='Yes Asks', 
+            line=dict(color='#EF4444', width=2),
+            showlegend=True
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='lines',
+            name='No Bids',
+            line=dict(color='#10B981', width=2),
+            showlegend=True
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[None], y=[None],
+            mode='lines',
+            name='No Asks',
+            line=dict(color='#EF4444', width=2),
+            showlegend=True
+        )
+    )
+    
     fig.update_layout(
         height=height,
-        margin=dict(l=60, r=20, t=50, b=40),
+        margin=dict(l=60, r=20, t=40, b=60),
         showlegend=True,
         legend=dict(
             orientation="h",
-            yanchor="bottom",
-            y=1.02,
+            yanchor="top",
+            y=1.0,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(0,0,0,0.8)",
-            bordercolor="rgba(255,255,255,0.2)",
-            borderwidth=1,
-            font=dict(size=10)
+            bgcolor="rgba(0,0,0,0)",
+            bordercolor="rgba(255,255,255,0)",
+            borderwidth=0,
+            font=dict(size=10, color="#FFFFFF")
         ),
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#FAFAFA', size=10),
+        font=dict(color='#FFFFFF', size=11),
         title=dict(
             text="Order Book - Liquidity Distribution",
-            font=dict(size=14, color='#FAFAFA'),
+            font=dict(size=14, color='#FFFFFF'),
             x=0.5,
-            xanchor='center'
-        )
+            y=0.98,
+            xanchor='center',
+            yanchor='top'
+        ),
+        template="plotly_dark"
     )
     
     return fig
