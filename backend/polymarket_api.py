@@ -42,18 +42,33 @@ class PolymarketAPI:
         self.chain_id = 137
         self.proxy_address = os.getenv("PROXY_ADDRESS", "")
     
-    def get_markets(self, limit: int = 10, archived: bool = False) -> List[Dict[str, Any]]:
+    def get_markets(self, limit: int = 10, archived: bool = False, offset: int = 0, 
+               order_by: str = "volume24hr", ascending: bool = False) -> List[Dict[str, Any]]:
         """
         Get markets from Polymarket Gamma API
-        Returns top markets by volume
+        Returns markets based on specified ordering and limit
+        
+        Args:
+            limit: Maximum number of markets to return (default: 10)
+            archived: Whether to include archived markets (default: False)
+            offset: Number of records to skip (default: 0)
+            order_by: Field to order results by (default: "volume24hr")
+                      Options: "volume24hr", "volume", "liquidity", "endDate", etc.
+            ascending: Sort direction (default: False = descending order)
+        
+        Returns:
+            List of market dictionaries
         """
         try:
             url = f"{self.gamma_api_url}/markets"
             params = {
                 "limit": limit,
                 "archived": archived,
-                "order": "volume24hr",  # Order by 24hr volume
-                "ascending": "false"    # Descending order (highest volume first)
+                "offset": offset,
+                "order": order_by,
+                "ascending": str(ascending).lower(),  # Convert bool to 'true'/'false' string
+                "closed": "false",  # Only fetch open markets,
+                "active": "true"
             }
             
             response = requests.get(url, params=params)
@@ -190,6 +205,9 @@ class PolymarketAPI:
         """
         Get order book data for a market using CLOB API
         Returns bid/ask data for each token in the market
+        
+        Uses the batch endpoint (get_books) to fetch multiple order books at once
+        instead of making individual requests for each token
         """
         try:
             # Get token IDs for the given market_id
@@ -213,31 +231,59 @@ class PolymarketAPI:
                     else:
                         outcome_names = outcomes
             
+            # Get all order books in a single request using the batch endpoint
+            books_data = self.get_books(token_ids)
+            if not books_data:
+                logging.error(f"Failed to get order books for market {market_id}")
+                # Fallback to individual requests if batch request fails
+                logging.info(f"Falling back to individual requests for {market_id}")
+                
+                order_books = {}
+                for idx, token_id in enumerate(token_ids):
+                    try:
+                        url = f"{self.host}/book"
+                        params = {"token_id": token_id}
+                        
+                        response = requests.get(url, params=params, timeout=10)
+                        if response.status_code == 200:
+                            book_data = response.json()
+                            
+                            # Determine outcome name
+                            outcome_name = outcome_names[idx] if idx < len(outcome_names) else f"Token_{idx}"
+                            
+                            order_books[outcome_name] = {
+                                'token_id': token_id,
+                                'bids': book_data.get('bids', []),
+                                'asks': book_data.get('asks', [])
+                            }
+                        else:
+                            logging.warning(f"Failed to get order book for token {token_id}: {response.status_code}")
+                            
+                    except Exception as e:
+                        logging.error(f"Error fetching order book for token {token_id}: {e}")
+                        continue
+                
+                return {
+                    'market_id': market_id,
+                    'order_books': order_books
+                }
+            
             order_books = {}
             
+            # Process the books data
             for idx, token_id in enumerate(token_ids):
-                try:
-                    url = f"{self.host}/book"
-                    params = {"token_id": token_id}
+                book_data = books_data.get(token_id)
+                if book_data:
+                    # Determine outcome name
+                    outcome_name = outcome_names[idx] if idx < len(outcome_names) else f"Token_{idx}"
                     
-                    response = requests.get(url, params=params, timeout=10)
-                    if response.status_code == 200:
-                        book_data = response.json()
-                        
-                        # Determine outcome name
-                        outcome_name = outcome_names[idx] if idx < len(outcome_names) else f"Token_{idx}"
-                        
-                        order_books[outcome_name] = {
-                            'token_id': token_id,
-                            'bids': book_data.get('bids', []),
-                            'asks': book_data.get('asks', [])
-                        }
-                    else:
-                        logging.warning(f"Failed to get order book for token {token_id}: {response.status_code}")
-                        
-                except Exception as e:
-                    logging.error(f"Error fetching order book for token {token_id}: {e}")
-                    continue
+                    order_books[outcome_name] = {
+                        'token_id': token_id,
+                        'bids': book_data.get('bids', []),
+                        'asks': book_data.get('asks', [])
+                    }
+                else:
+                    logging.warning(f"No order book data for token {token_id}")
             
             return {
                 'market_id': market_id,
@@ -246,4 +292,57 @@ class PolymarketAPI:
             
         except Exception as e:
             logging.error(f"Error fetching order book for market {market_id}: {e}")
+            return None
+        
+    def get_books(self, token_ids: List[str]) -> Optional[Dict[str, Any]]:
+        """
+        Get multiple order books at once using the batch endpoint
+        https://docs.polymarket.com/developers/CLOB/prices-books/get-books
+        
+        Args:
+            token_ids: List of token IDs to fetch order books for
+            
+        Returns:
+            Dictionary containing order books for the requested tokens.
+            Returns an empty dict if no order books exist (which can happen for resolved markets).
+        """
+        if not token_ids:
+            logging.error("No token IDs provided to get_books")
+            return None
+        
+        try:
+            url = f"{self.host}/books"
+            
+            # According to docs, need to format each token ID as a BookParams object
+            # Format: [{"token_id": "123"}, {"token_id": "456"}, ...]
+            params = [{"token_id": token_id} for token_id in token_ids]
+            
+            headers = {"Content-Type": "application/json"}
+            logging.debug(f"Sending request to {url} with params: {params}")
+            
+            response = requests.post(url, json=params, headers=headers, timeout=15)
+            
+            if response.status_code == 200:
+                books_data = response.json()
+                
+                # Handle case where the API returns an empty list (no active order books)
+                # This happens for markets that have closed/resolved
+                if not books_data and isinstance(books_data, list):
+                    logging.info(f"No active order books available for tokens {token_ids[:2]}... (likely resolved market)")
+                    return {}
+                
+                # Convert list of books to dictionary keyed by token_id
+                result = {}
+                for book in books_data:
+                    # The token_id field may be in "asset_id" or "tokenId" based on docs
+                    token_id = book.get("asset_id") or book.get("tokenId")
+                    if token_id:
+                        result[token_id] = {"bids": book.get("bids", []), "asks": book.get("asks", [])}
+                return result
+            else:
+                logging.warning(f"Failed to get order books: {response.status_code} - {response.text}")
+                return None
+                
+        except Exception as e:
+            logging.error(f"Error fetching order books: {e}")
             return None

@@ -5,7 +5,14 @@ A simple Streamlit dashboard displaying the **top 5 prediction markets by volume
 ## 🚀 Quick Start
 
 ```bash
+# Run the main application
 streamlit run frontend/app.py
+
+# Run the batch order book demo
+streamlit run frontend/batch_demo.py
+
+# Run the batch vs. individual performance test
+python demo_batch_fetching.py
 ```
 
 Visit: http://localhost:8501
@@ -15,12 +22,20 @@ Visit: http://localhost:8501
 ```
 trading-polymarket/
 ├── backend/
-│   ├── polymarket_api.py    # Polymarket API client
+│   ├── polymarket_api.py    # Polymarket API client with batch order book support
 │   └── kalshi_api.py        # Kalshi API client
 ├── frontend/
-│   └── app.py               # Streamlit dashboard
+│   ├── app.py               # Main Streamlit dashboard
+│   ├── batch_demo.py        # Demo of batch order book fetching
+│   ├── charts.py            # Chart generation functions
+│   ├── components.py        # UI components
+│   ├── data.py              # Data fetching and processing
+│   ├── styles.py            # CSS styling
+│   └── utils.py             # Utility functions
+├── demo_batch_fetching.py   # Performance test for batch vs individual requests
+├── test_get_books.py        # Tests for batch order book fetching
 ├── requirements.txt         # Dependencies
-└── README.md               # This file
+└── README.md                # This file
 ```
 
 ## 📈 Features
@@ -33,6 +48,8 @@ trading-polymarket/
 - **Auto-refresh**: Manual refresh button to get latest data
 - **Dark Mode**: Auto-enabled dark theme for better viewing
 - **Compact Design**: Dense layout to see more information at once
+- **Batch API Requests**: Optimized order book fetching using batch endpoints
+- **Performance Metrics**: Shows the efficiency of batch vs individual requests
 
 ## 📊 What You'll See
 

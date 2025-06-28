@@ -165,7 +165,32 @@ def render_market_details(market):
                 with depth_tab:
                     st.markdown("## Order Book Depth Chart")
                     with st.spinner("Loading order book data..."):
-                        order_book_data = polymarket_api.get_order_book(market_id)
+                        # Import the batch fetching function
+                        from data import fetch_order_books_batch
+                        
+                        # Check if we have pre-fetched order book data in session state
+                        order_book_data = None
+                        if hasattr(st.session_state, 'order_books_cache') and market_id in st.session_state.order_books_cache:
+                            order_book_data = st.session_state.order_books_cache[market_id]
+                            st.caption("⚡ Using pre-fetched order book data from batch request")
+                        else:
+                            # Cache miss - we need to fetch this market's order book
+                            st.caption("📡 Fetching order book data for this market")
+                            
+                            # Fetch using the batch function but only for this one market
+                            # This will still use the more efficient batch endpoint
+                            order_books_cache = fetch_order_books_batch([market], max_markets=1)
+                            if market_id in order_books_cache:
+                                order_book_data = order_books_cache[market_id]
+                                
+                                # Update the session state cache
+                                if not hasattr(st.session_state, 'order_books_cache'):
+                                    st.session_state.order_books_cache = {}
+                                st.session_state.order_books_cache[market_id] = order_book_data
+                            else:
+                                # Last resort fallback to old method
+                                st.warning("⚠️ Falling back to individual request")
+                                order_book_data = polymarket_api.get_order_book(market_id)
                         
                         if order_book_data and order_book_data.get('order_books'):
                             # Add a summary of the order book
