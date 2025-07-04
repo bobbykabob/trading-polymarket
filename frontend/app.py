@@ -56,13 +56,10 @@ def main():
     with st.spinner("Preparing market data..."):
         start_time = time.time()
         
-        # Only fetch for Polymarket markets since we implemented the batch endpoint for Polymarket only
-        poly_markets = [m for m in top_markets if m.get('platform') == 'Polymarket']
-        
-        # Explicitly fetch ALL markets in one batch (no limit)
+        # Fetch order books for all markets (both Polymarket and Kalshi)
         order_books_cache = fetch_order_books_batch(
-            markets=poly_markets, 
-            max_markets=len(poly_markets)  # Fetch ALL Polymarket markets in one batch
+            markets=top_markets, 
+            max_markets=len(top_markets)  # Fetch ALL markets in one batch
         )
         
         # Store in session state for components to use
@@ -134,10 +131,10 @@ def main():
                          help=f"Estimated time saved vs. {st.session_state.batch_fetch_count} individual requests")
         
         # Add detailed explanation        
-        st.info("⚡ **Batch API Optimization**: All order books are fetched in a single API call instead of making separate requests for each market. This reduces API rate limiting issues and improves load times.")
+        st.info("⚡ **Batch API Optimization**: Order books are fetched efficiently using batch endpoints where available (Polymarket) or individual optimized requests (Kalshi). This reduces API rate limiting issues and improves load times.")
         
         # Add a technical note
-        st.caption("Technical note: Using the `/books` batch endpoint instead of multiple `/book` requests")
+        st.caption("Technical note: Using batch endpoints for Polymarket and individual requests for Kalshi markets")
     
     # Footer
     st.caption(f"*Updated: {datetime.now().strftime('%H:%M:%S')} | Data: Live APIs*")

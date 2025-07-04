@@ -23,8 +23,13 @@ def create_price_history_chart(historical_data):
         data = token_histories.get(token_id, [])
         for point in data:
             if 't' in point and 'p' in point:
+                timestamp = point['t']
+                # Handle different timestamp formats (seconds vs milliseconds)
+                if timestamp > 1e12:  # If timestamp is in milliseconds
+                    timestamp = timestamp / 1000  # Convert to seconds
+                
                 chart_data.append({
-                    'time': datetime.fromtimestamp(point['t']),
+                    'time': datetime.fromtimestamp(timestamp),
                     'price': float(point['p']),
                     'outcome': outcome_name.capitalize()
                 })
@@ -34,8 +39,13 @@ def create_price_history_chart(historical_data):
         for token_id, data in token_histories.items():
             for point in (data or []):
                 if 't' in point and 'p' in point:
+                    timestamp = point['t']
+                    # Handle different timestamp formats (seconds vs milliseconds)
+                    if timestamp > 1e12:  # If timestamp is in milliseconds
+                        timestamp = timestamp / 1000  # Convert to seconds
+                    
                     chart_data.append({
-                        'time': datetime.fromtimestamp(point['t']),
+                        'time': datetime.fromtimestamp(timestamp),
                         'price': float(point['p']),
                         'outcome': str(token_id)
                     })
@@ -292,18 +302,40 @@ def create_order_book_chart(order_book_data):
         bid_sizes = []
         cumulative_bid_size = 0
         
-        # Sort bids by price descending (highest first)
+        # Handle different data formats between platforms
         try:
-            sorted_bids = sorted(bids, key=lambda x: float(x['price']), reverse=True)
-            
-            for bid in sorted_bids:
-                price = float(bid['price'])
-                size = float(bid['size'])
-                cumulative_bid_size += size
-                bid_prices.append(price)
-                bid_sizes.append(cumulative_bid_size)
+            # Check if this is Kalshi format (list of [price, size]) or Polymarket format (dict)
+            if bids and isinstance(bids[0], list):
+                # Kalshi format: [[price_str, size_str], ...]
+                bid_tuples = []
+                for bid in bids:
+                    if len(bid) >= 2:
+                        try:
+                            price = float(bid[0])
+                            size = float(bid[1])
+                            bid_tuples.append((price, size))
+                        except (ValueError, TypeError):
+                            continue
+                # Sort by price descending (highest first)
+                sorted_bids = sorted(bid_tuples, key=lambda x: x[0], reverse=True)
                 
-        except (KeyError, ValueError) as e:
+                for price, size in sorted_bids:
+                    cumulative_bid_size += size
+                    bid_prices.append(price)
+                    bid_sizes.append(cumulative_bid_size)
+                    
+            else:
+                # Polymarket format: [{'price': ..., 'size': ...}, ...]
+                sorted_bids = sorted(bids, key=lambda x: float(x['price']), reverse=True)
+                
+                for bid in sorted_bids:
+                    price = float(bid['price'])
+                    size = float(bid['size'])
+                    cumulative_bid_size += size
+                    bid_prices.append(price)
+                    bid_sizes.append(cumulative_bid_size)
+                    
+        except (KeyError, ValueError, IndexError) as e:
             print(f"Error processing bids for {outcome}: {e}")
             continue
         
@@ -312,18 +344,40 @@ def create_order_book_chart(order_book_data):
         ask_sizes = []
         cumulative_ask_size = 0
         
-        # Sort asks by price ascending (lowest first)
+        # Handle different data formats between platforms
         try:
-            sorted_asks = sorted(asks, key=lambda x: float(x['price']))
-            
-            for ask in sorted_asks:
-                price = float(ask['price'])
-                size = float(ask['size'])
-                cumulative_ask_size += size
-                ask_prices.append(price)
-                ask_sizes.append(cumulative_ask_size)
+            # Check if this is Kalshi format (list of [price, size]) or Polymarket format (dict)
+            if asks and isinstance(asks[0], list):
+                # Kalshi format: [[price_str, size_str], ...]
+                ask_tuples = []
+                for ask in asks:
+                    if len(ask) >= 2:
+                        try:
+                            price = float(ask[0])
+                            size = float(ask[1])
+                            ask_tuples.append((price, size))
+                        except (ValueError, TypeError):
+                            continue
+                # Sort by price ascending (lowest first)
+                sorted_asks = sorted(ask_tuples, key=lambda x: x[0])
                 
-        except (KeyError, ValueError) as e:
+                for price, size in sorted_asks:
+                    cumulative_ask_size += size
+                    ask_prices.append(price)
+                    ask_sizes.append(cumulative_ask_size)
+                    
+            else:
+                # Polymarket format: [{'price': ..., 'size': ...}, ...]
+                sorted_asks = sorted(asks, key=lambda x: float(x['price']))
+                
+                for ask in sorted_asks:
+                    price = float(ask['price'])
+                    size = float(ask['size'])
+                    cumulative_ask_size += size
+                    ask_prices.append(price)
+                    ask_sizes.append(cumulative_ask_size)
+                    
+        except (KeyError, ValueError, IndexError) as e:
             print(f"Error processing asks for {outcome}: {e}")
             continue
         

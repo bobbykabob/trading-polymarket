@@ -11,7 +11,6 @@ from dotenv import load_dotenv
 
 
 # Ensure INFO logs are shown
-logging.basicConfig(level=logging.INFO)
 load_dotenv()
 
 class PolymarketAPI:

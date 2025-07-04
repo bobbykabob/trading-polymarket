@@ -129,9 +129,19 @@ def render_market_details(market):
     
     # Historical price chart and order book
     market_id = market.get('id')
+    platform = market.get('platform', 'Unknown')
+    
     if market_id:
         try:
-            polymarket_api, _ = get_api_clients()
+            polymarket_api, kalshi_api = get_api_clients()
+            
+            # Determine which API to use based on the market's platform
+            if platform == "Kalshi":
+                api_client = kalshi_api
+                st.caption(f"🔵 Kalshi Market Data")
+            else:
+                api_client = polymarket_api
+                st.caption(f"🟣 Polymarket Data")
             
             # Use container to give charts more space in the UI
             with st.container():
@@ -151,7 +161,7 @@ def render_market_details(market):
                 with price_tab:
                     st.markdown("### 7-Day Price History")
                     with st.spinner("Loading price history data..."):
-                        historical_data = polymarket_api.get_market_history(market_id, days=7)
+                        historical_data = api_client.get_market_history(market_id, days=7)
                         
                         if historical_data:
                             fig = create_price_history_chart(historical_data)
@@ -178,7 +188,7 @@ def render_market_details(market):
                             st.caption("📡 Fetching order book data for this market")
                             
                             # Fetch using the batch function but only for this one market
-                            # This will still use the more efficient batch endpoint
+                            # This will still use the more efficient batch endpoint for supported platforms
                             order_books_cache = fetch_order_books_batch([market], max_markets=1)
                             if market_id in order_books_cache:
                                 order_book_data = order_books_cache[market_id]
@@ -188,9 +198,9 @@ def render_market_details(market):
                                     st.session_state.order_books_cache = {}
                                 st.session_state.order_books_cache[market_id] = order_book_data
                             else:
-                                # Last resort fallback to old method
-                                st.warning("⚠️ Falling back to individual request")
-                                order_book_data = polymarket_api.get_order_book(market_id)
+                                # Last resort fallback to individual API request
+                                st.warning(f"⚠️ Falling back to individual {platform} API request")
+                                order_book_data = api_client.get_order_book(market_id)
                         
                         if order_book_data and order_book_data.get('order_books'):
                             # Add a summary of the order book
@@ -198,15 +208,31 @@ def render_market_details(market):
                             total_asks = 0
                             
                             for outcome, data in order_book_data['order_books'].items():
-                                for bid in data.get('bids', []):
+                                # Handle different formats between Polymarket and Kalshi
+                                bids = data.get('bids', [])
+                                asks = data.get('asks', [])
+                                
+                                # Process bids - handle both formats
+                                for bid in bids:
                                     try:
-                                        total_bids += float(bid.get('size', 0))
+                                        if isinstance(bid, list) and len(bid) >= 2:
+                                            # Kalshi format: [price, size] 
+                                            total_bids += float(bid[1])
+                                        elif isinstance(bid, dict):
+                                            # Polymarket format: {'price': ..., 'size': ...}
+                                            total_bids += float(bid.get('size', 0))
                                     except (ValueError, TypeError):
                                         pass
                                 
-                                for ask in data.get('asks', []):
+                                # Process asks - handle both formats  
+                                for ask in asks:
                                     try:
-                                        total_asks += float(ask.get('size', 0))
+                                        if isinstance(ask, list) and len(ask) >= 2:
+                                            # Kalshi format: [price, size]
+                                            total_asks += float(ask[1])
+                                        elif isinstance(ask, dict):
+                                            # Polymarket format: {'price': ..., 'size': ...}
+                                            total_asks += float(ask.get('size', 0))
                                     except (ValueError, TypeError):
                                         pass
                             
@@ -249,7 +275,7 @@ def render_market_details(market):
                             else:
                                 st.info("Could not generate order book chart with the available data")
                         else:
-                            st.info("No order book data available for this market")
+                            st.info(f"No order book data available for this {platform} market")
                 
         except Exception as e:
             st.caption(f"Chart unavailable: {str(e)[:30]}...")
