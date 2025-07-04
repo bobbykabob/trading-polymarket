@@ -4,18 +4,19 @@ A Streamlit dashboard displaying **top prediction markets by volume** from Polym
 
 ## 🚀 Quick Start
 
+### Local Development
 ```bash
 # Run the main application
+streamlit run streamlit_app.py
+
+# Or run directly from frontend
 streamlit run frontend/app.py
-
-# Run the batch order book demo
-streamlit run frontend/batch_demo.py
-
-# Run the batch vs. individual performance test
-python demo_batch_fetching.py
 ```
 
-Visit: http://localhost:8501
+### 🌐 Deploy to Streamlit Community Cloud
+Ready to deploy in 5 minutes! See [STREAMLIT_DEPLOY.md](STREAMLIT_DEPLOY.md) for step-by-step instructions.
+
+**Your app will be live at**: `https://your-app-name.streamlit.app`
 
 ## 📁 Project Structure
 

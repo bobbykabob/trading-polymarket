@@ -12,8 +12,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend'))
 
-from data import fetch_market_data, process_markets, fetch_order_books_batch, get_api_clients
-from charts import create_order_book_chart
+from frontend.data import fetch_market_data, process_markets, fetch_order_books_batch, get_api_clients
+from frontend.charts import create_order_book_chart
 
 # Page config
 st.set_page_config(

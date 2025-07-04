@@ -7,10 +7,10 @@ import streamlit as st
 from datetime import datetime
 import time
 
-from styles import ULTRA_COMPACT_CSS
-from data import fetch_market_data, process_markets, fetch_order_books_batch
-from components import render_controls, render_summary_stats, render_table_header, render_market_row
-from charts import create_volume_chart, create_order_book_chart
+from frontend.styles import ULTRA_COMPACT_CSS
+from frontend.data import fetch_market_data, process_markets, fetch_order_books_batch
+from frontend.components import render_controls, render_summary_stats, render_table_header, render_market_row
+from frontend.charts import create_volume_chart, create_order_book_chart
 
 # Configure Streamlit page
 st.set_page_config(

@@ -3,9 +3,9 @@ UI components for the trading markets dashboard
 """
 
 import streamlit as st
-from utils import format_volume, format_price, get_platform_icon, get_trend_icon, format_end_date
-from charts import create_price_history_chart, create_order_book_chart
-from data import get_api_clients
+from frontend.utils import format_volume, format_price, get_platform_icon, get_trend_icon, format_end_date
+from frontend.charts import create_price_history_chart, create_order_book_chart
+from frontend.data import get_api_clients
 
 
 def render_controls():
