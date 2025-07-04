@@ -78,14 +78,27 @@ class PolymarketAPI:
             # Process and clean the market data
             processed_markets = []
             for market in markets_data:
+                # Handle string/float conversion for volume fields
+                volume_24hr = market.get("volume24hr", 0)
+                volume = market.get("volume", 0)
+                liquidity = market.get("liquidity", 0)
+                
+                # Convert strings to floats if needed
+                if isinstance(volume_24hr, str):
+                    volume_24hr = float(volume_24hr) if volume_24hr else 0
+                if isinstance(volume, str):
+                    volume = float(volume) if volume else 0
+                if isinstance(liquidity, str):
+                    liquidity = float(liquidity) if liquidity else 0
+                
                 processed_market = {
                     "id": market.get("id"),
                     "question": market.get("question"),
                     "description": market.get("description", ""),
                     "end_date": market.get("endDateIso"),
-                    "volume_24hr": market.get("volume24hr", 0),
-                    "volume": market.get("volume", 0),
-                    "liquidity": market.get("liquidity", 0),
+                    "volume_24hr": volume_24hr,
+                    "volume": volume,
+                    "liquidity": liquidity,
                     "yes_price": None,
                     "no_price": None,
                     "platform": "Polymarket"

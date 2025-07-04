@@ -1,6 +1,6 @@
 # Trading Markets Dashboard
 
-A simple Streamlit dashboard displaying the **top 5 prediction markets by volume** from Polymarket and Kalshi.
+A Streamlit dashboard displaying **top prediction markets by volume** from Polymarket and Kalshi, focusing on **actively tradeable markets only**.
 
 ## 🚀 Quick Start
 
@@ -40,11 +40,12 @@ trading-polymarket/
 
 ## 📈 Features
 
-- **Top 5 Markets**: Shows highest volume markets from both platforms
-- **Real-time Data**: Live market data via Polymarket Gamma API  
+- **Top Markets by Volume**: Shows highest volume tradeable markets from both platforms  
+- **Active Markets Only**: Kalshi integration filters to only show open/tradeable markets (not settled)
+- **Real-time Data**: Live market data via Polymarket Gamma API and Kalshi Trade API
 - **Platform Selection**: Choose between Polymarket and Kalshi
-- **Market Details**: Prices, volumes, end dates, descriptions
-- **Interactive Charts**: Volume comparisons and price visualizations
+- **Market Details**: Prices, volumes, end dates, descriptions with order book depth
+- **Interactive Charts**: Volume comparisons, price history, and order book visualizations
 - **Auto-refresh**: Manual refresh button to get latest data
 - **Dark Mode**: Auto-enabled dark theme for better viewing
 - **Compact Design**: Dense layout to see more information at once
@@ -96,7 +97,9 @@ pip install -r requirements.txt
 ## 📡 Data Sources
 
 - **Polymarket**: Live data from Gamma API (https://gamma-api.polymarket.com/markets)
-- **Kalshi**: Mock data (ready for real API integration)
+- **Kalshi**: Live data from Kalshi Trade API (https://api.elections.kalshi.com/trade-api/v2)
+  - *Note: Only shows open/tradeable markets (not settled ones)*
+  - *Open market volumes are typically lower (~$500-$3K) as high-volume markets have often settled*
 
 ## 🎯 Simple & Clean
 
@@ -106,4 +109,18 @@ pip install -r requirements.txt
 
 ---
 
-*Last updated: 2025-06-28*
+## 📊 Volume Analysis Summary
+
+**Understanding Kalshi Volume Data:**
+- **Volume Type**: Total cumulative trading volume in USD (not daily average)
+- **24h Volume**: Trading volume in the last 24 hours  
+- **Open vs Settled Markets**: 
+  - Open markets (tradeable): Typically $500-$3,275 volume
+  - Settled markets (not tradeable): Can exceed $350,000+ volume
+  - **Why?** High-volume markets often settle after major events conclude
+
+**Current Market State**: The ~$3K max volume in open Kalshi markets is typical and represents genuinely tradeable opportunities. Higher volumes are usually found in settled (non-tradeable) markets.
+
+---
+
+*Last updated: July 3, 2025*

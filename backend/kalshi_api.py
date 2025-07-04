@@ -47,14 +47,15 @@ class KalshiAPI:
         """
         try:
             url = f"{self.base_url}/markets"
-            params = {
-                "limit": limit,
-                "cursor": offset,
-                "status": "open" if not archived else None
-            }
             
-            # Remove None values
-            params = {k: v for k, v in params.items() if v is not None}
+            # Get a larger initial set to find high-volume markets
+            fetch_limit = max(limit * 4, 100)  # Fetch 4x the requested amount or minimum 100
+            
+            params = {
+                "limit": fetch_limit,
+                "cursor": offset,
+                "status": "open",  # Only show open markets that can be traded
+            }
             
             response = self.session.get(url, params=params)
             response.raise_for_status()
@@ -70,9 +71,9 @@ class KalshiAPI:
                     "question": market.get("title"),
                     "description": market.get("subtitle", ""),
                     "end_date": market.get("close_time"),
-                    "volume_24hr": market.get("volume_24h", 0),
-                    "volume": market.get("volume", 0),
-                    "liquidity": market.get("liquidity", 0),
+                    "volume_24hr": (market.get("volume_24h", 0) or 0) / 100,  # Convert cents to dollars
+                    "volume": (market.get("volume", 0) or 0) / 100,           # Convert cents to dollars
+                    "liquidity": (market.get("liquidity", 0) or 0) / 100,     # Convert cents to dollars
                     "yes_price": market.get("yes_bid", 0) / 100 if market.get("yes_bid") else None,  # Convert cents to dollars
                     "no_price": market.get("no_bid", 0) / 100 if market.get("no_bid") else None,   # Convert cents to dollars
                     "platform": "Kalshi"
@@ -81,13 +82,16 @@ class KalshiAPI:
             
             # Sort by specified field
             if order_by == "volume":
+                processed_markets.sort(key=lambda x: x.get('volume', 0), reverse=not ascending)
+            elif order_by == "volume_24h":
                 processed_markets.sort(key=lambda x: x.get('volume_24hr', 0), reverse=not ascending)
             elif order_by == "liquidity":
                 processed_markets.sort(key=lambda x: x.get('liquidity', 0), reverse=not ascending)
             elif order_by == "close_time":
                 processed_markets.sort(key=lambda x: x.get('end_date', ''), reverse=not ascending)
             
-            return processed_markets
+            # Return only the requested number after sorting
+            return processed_markets[:limit]
             
         except requests.RequestException as e:
             logging.error(f"Error fetching markets from Kalshi: {e}")
@@ -288,30 +292,74 @@ class KalshiAPI:
             # Process yes side orders - Kalshi format is [[price_cents, size], ...]
             yes_orders = orderbook.get("yes")
             if yes_orders and isinstance(yes_orders, list):
-                # In Kalshi, the orders are in format [[price_cents, size], ...]
-                # We need to separate bids and asks, but Kalshi might not distinguish them clearly
-                # For now, let's treat all yes orders as bids (best available price)
-                for order in yes_orders:
-                    if len(order) >= 2:
-                        price_cents, size = order[0], order[1]
-                        yes_bids.append([
-                            str(price_cents / 100),  # Convert cents to dollars
-                            str(size)
-                        ])
+                # In Kalshi, these are buy orders for Yes tokens at different price levels
+                # Sort by price and split into bids (lower half) and asks (upper half)
+                sorted_yes = sorted(yes_orders, key=lambda x: x[0])
+                
+                if len(sorted_yes) > 0:
+                    # Split orders: lower prices = bids, higher prices = asks
+                    mid_point = len(sorted_yes) // 2
+                    
+                    # Lower half as bids (people buying at lower prices)
+                    for order in sorted_yes[:mid_point] if mid_point > 0 else sorted_yes[:1]:
+                        if len(order) >= 2:
+                            price_cents, size = order[0], order[1]
+                            price_dollars = price_cents / 100
+                            yes_bids.append([str(price_dollars), str(size)])
+                    
+                    # Upper half as asks (people selling at higher prices)  
+                    for order in sorted_yes[mid_point:] if mid_point > 0 else sorted_yes[1:]:
+                        if len(order) >= 2:
+                            price_cents, size = order[0], order[1]
+                            price_dollars = price_cents / 100
+                            yes_asks.append([str(price_dollars), str(size)])
             
             # Process no side orders
             no_orders = orderbook.get("no")
             if no_orders and isinstance(no_orders, list):
-                for order in no_orders:
-                    if len(order) >= 2:
-                        price_cents, size = order[0], order[1]
-                        no_bids.append([
-                            str(price_cents / 100),  # Convert cents to dollars
-                            str(size)
-                        ])
+                # Same logic for No tokens
+                sorted_no = sorted(no_orders, key=lambda x: x[0])
+                
+                if len(sorted_no) > 0:
+                    # Split orders: lower prices = bids, higher prices = asks
+                    mid_point = len(sorted_no) // 2
+                    
+                    # Lower half as bids
+                    for order in sorted_no[:mid_point] if mid_point > 0 else sorted_no[:1]:
+                        if len(order) >= 2:
+                            price_cents, size = order[0], order[1]
+                            price_dollars = price_cents / 100
+                            no_bids.append([str(price_dollars), str(size)])
+                    
+                    # Upper half as asks
+                    for order in sorted_no[mid_point:] if mid_point > 0 else sorted_no[1:]:
+                        if len(order) >= 2:
+                            price_cents, size = order[0], order[1]
+                            price_dollars = price_cents / 100
+                            no_asks.append([str(price_dollars), str(size)])
+            
+            # Return format compatible with the frontend charts
+            all_bids = []
+            all_asks = []
+            
+            # Combine yes and no bids/asks
+            all_bids.extend(yes_bids)
+            all_bids.extend(no_bids)
+            all_asks.extend(yes_asks) 
+            all_asks.extend(no_asks)
+            
+            # Sort bids by price descending, asks by price ascending
+            all_bids.sort(key=lambda x: float(x[0]), reverse=True)
+            all_asks.sort(key=lambda x: float(x[0]))
+            
+            # Convert to the format expected by the frontend
+            formatted_bids = [{'price': float(bid[0]), 'size': int(bid[1])} for bid in all_bids]
+            formatted_asks = [{'price': float(ask[0]), 'size': int(ask[1])} for ask in all_asks]
             
             return {
                 'market_id': market_id,
+                'bids': formatted_bids,
+                'asks': formatted_asks,
                 'order_books': {
                     'Yes': {
                         'token_id': 'yes_token',
