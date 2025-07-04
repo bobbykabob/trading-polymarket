@@ -24,30 +24,28 @@ st.markdown(ULTRA_COMPACT_CSS, unsafe_allow_html=True)
 
 def main():
     """Main application"""
-    
     # Header
     st.title("Top Markets by Volume")
-    
     # Render controls
     platforms, num_markets, refresh_clicked, auto_refresh = render_controls()
-    
     # Handle refresh
     if refresh_clicked:
         st.cache_data.clear()
         st.rerun()
-    
     # Validate inputs
     if not platforms:
         st.warning("Please select at least one platform.")
         return
-    
     # Fetch and process data
     with st.spinner("Loading..."):
         all_markets = fetch_market_data(platforms, num_markets)
-    
     if not all_markets:
         st.error("No data available. Please refresh.")
         return
+
+# Allow running as a script or as an import
+if __name__ == "__main__":
+    main()
     
     top_markets = process_markets(all_markets, num_markets)
     

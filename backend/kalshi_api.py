@@ -138,7 +138,9 @@ class KalshiAPI:
         """
         Get historical price data for a market using the candlesticks endpoint
         Reference: https://trading-api.readme.io/reference/getmarketcandlesticks-1
-        """
+        """Import error: cannot import name 'main' from 'frontend.app' (/mount/src/trading-polymarket/frontend/app.py)
+
+Please ensure all dependencies are installed: pip install -r requirements.txt
         try:
             logging.debug(f"Getting market history for {market_id}, days: {days}")
             
