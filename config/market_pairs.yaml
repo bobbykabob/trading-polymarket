@@ -1,0 +1,21 @@
+# Manual market pairs - high confidence matches
+pairs:
+  - polymarket_id: "21742633143462077347409894363331703050164692090159753447536090927577877651421"
+    kalshi_id: "PRES-24"
+    confidence: 1.0
+    notes: "2024 Presidential Election"
+    
+  - polymarket_id: "69236923692369236923692369236923692369236923692369236923692369236923"
+    kalshi_id: "HOUSE-24"
+    confidence: 1.0
+    notes: "2024 House Control"
+
+# Excluded pairs - known to NOT be equivalent
+excluded:
+  - polymarket_id: "111111111111111111111111111111111111111111111111111111111111111111111111"
+    kalshi_id: "SENATE-24"
+    reason: "Different time frames"
+    
+  - polymarket_id: "222222222222222222222222222222222222222222222222222222222222222222222222"
+    kalshi_id: "BIDEN-24"
+    reason: "Different outcomes"

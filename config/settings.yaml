@@ -1,0 +1,41 @@
+arbitrage:
+  min_profit_threshold: 0.05  # 5% minimum profit after fees
+  max_position_size: 1000     # $1000 max per trade
+  fee_threshold: 0.001        # 0.1% minimum fee consideration
+  slippage_buffer: 0.02       # 2% slippage buffer
+  alert_cooldown: 300         # 5 minutes between alerts for same market
+
+platforms:
+  polymarket:
+    fee_rate: 0.02            # 2% fee rate
+    api_rate_limit: 100       # requests per minute
+    min_volume: 100           # minimum volume for consideration
+    websocket_url: "wss://ws-subscriptions-clob.polymarket.com"
+    
+  kalshi:
+    fee_rate: 0.01            # 1% fee rate  
+    api_rate_limit: 50        # requests per minute
+    min_volume: 50            # minimum volume for consideration
+    websocket_url: "wss://api.elections.kalshi.com/trade-api/ws"
+
+market_matching:
+  similarity_threshold: 0.8   # minimum similarity score for auto-matching
+  fuzzy_threshold: 85         # fuzzy string matching threshold
+  semantic_model: "all-MiniLM-L6-v2"  # sentence transformer model
+  manual_pairs_file: "market_pairs.yaml"
+
+monitoring:
+  update_interval: 30         # seconds between market updates
+  batch_size: 20              # markets per batch request
+  max_concurrent: 5           # max concurrent API requests
+  
+alerts:
+  email_enabled: false
+  sms_enabled: false
+  webhook_enabled: false
+  min_profit_for_alert: 0.1   # 10% minimum profit for alerts
+
+database:
+  type: "sqlite"              # sqlite or postgresql
+  path: "data/arbitrage.db"
+  backup_interval: 3600       # seconds between backups

@@ -6,16 +6,30 @@ Main application entry point
 import streamlit as st
 from datetime import datetime
 import time
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 from frontend.styles import ULTRA_COMPACT_CSS
 from frontend.data import fetch_market_data, process_markets, fetch_order_books_batch
 from frontend.components import render_controls, render_summary_stats, render_table_header, render_market_row
 from frontend.charts import create_volume_chart, create_order_book_chart
 
+# Import arbitrage dashboard
+try:
+    from frontend.pages.arbitrage import render_arbitrage_dashboard
+    ARBITRAGE_AVAILABLE = True
+except ImportError as e:
+    st.error(f"Arbitrage dashboard not available: {e}")
+    ARBITRAGE_AVAILABLE = False
+
 # Configure Streamlit page
 st.set_page_config(
-    page_title="Top Markets Dashboard",
-    page_icon="",
+    page_title="Trading Markets Dashboard",
+    page_icon="📊",
     layout="wide"
 )
 
@@ -25,8 +39,39 @@ st.markdown(ULTRA_COMPACT_CSS, unsafe_allow_html=True)
 def main():
     """Main application"""
     
+    # Sidebar navigation
+    st.sidebar.title("📊 Trading Dashboard")
+    
+    # Page selection
+    pages = {
+        "🏠 Markets Overview": "markets",
+        "🔄 Arbitrage Dashboard": "arbitrage" if ARBITRAGE_AVAILABLE else None
+    }
+    
+    # Filter out None values
+    available_pages = {k: v for k, v in pages.items() if v is not None}
+    
+    selected_page = st.sidebar.radio(
+        "Navigation",
+        list(available_pages.keys()),
+        index=0
+    )
+    
+    # Route to selected page
+    page_value = available_pages[selected_page]
+    
+    if page_value == "markets":
+        render_markets_page()
+    elif page_value == "arbitrage":
+        render_arbitrage_dashboard()
+    else:
+        st.error("Page not found")
+
+def render_markets_page():
+    """Render the markets overview page"""
+    
     # Header
-    st.title("Top Markets by Volume")
+    st.title("📈 Top Markets by Volume")
     
     # Render controls
     platforms, num_markets, refresh_clicked, auto_refresh = render_controls()

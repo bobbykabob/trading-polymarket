@@ -9,3 +9,10 @@ openai
 pydantic
 aiohttp
 asyncio
+PyYAML>=6.0
+fuzzywuzzy>=0.18.0
+sentence-transformers>=2.2.0
+sqlalchemy>=2.0.0
+alembic>=1.12.0
+websockets>=11.0.0
+python-levenshtein>=0.20.0
