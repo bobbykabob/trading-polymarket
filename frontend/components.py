@@ -176,7 +176,7 @@ def render_market_details(market):
                     st.markdown("## Order Book Depth Chart")
                     with st.spinner("Loading order book data..."):
                         # Import the batch fetching function
-                        from data import fetch_order_books_batch
+                        from frontend.data import fetch_order_books_batch
                         
                         # Check if we have pre-fetched order book data in session state
                         order_book_data = None
